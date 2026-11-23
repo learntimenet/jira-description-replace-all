@@ -1,0 +1,115 @@
+<!doctype html>
+<!--
+  Editor tests for core.js. Open this file in Chrome or Edge (needs internet: ProseMirror,
+  the engine behind Jira Cloud's editor, is loaded from esm.sh). Results appear on the page.
+  Headless: msedge --headless=new --allow-file-access-from-files --virtual-time-budget=10000 --dump-dom test/editor.test.html
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>core.js editor tests</title>
+  <style>body { font: 14px system-ui; } .pass { color: green; } .fail { color: #b00; } [contenteditable], textarea { border: 1px solid #ccc; padding: 6px; margin: 6px 0; min-height: 40px; width: 500px; display: block; }</style>
+</head>
+<body>
+  <h1>core.js editor tests</h1>
+  <pre id="results">running…</pre>
+  <div id="pm"></div>
+  <div id="plain" contenteditable="true"></div>
+  <textarea id="ta"></textarea>
+  <div id="noise"></div>
+
+  <script src="../core.js"></script>
+  <script type="module">
+    import { Schema, DOMParser as PMParser } from 'https://esm.sh/prosemirror-model@1.24.1';
+    import { schema as basic } from 'https://esm.sh/prosemirror-schema-basic@1.2.3?deps=prosemirror-model@1.24.1';
+    import { EditorState } from 'https://esm.sh/prosemirror-state@1.4.3?deps=prosemirror-model@1.24.1';
+    import { EditorView } from 'https://esm.sh/prosemirror-view@1.37.1?deps=prosemirror-model@1.24.1,prosemirror-state@1.4.3';
+    import { history, undo } from 'https://esm.sh/prosemirror-history@1.4.1?deps=prosemirror-model@1.24.1,prosemirror-state@1.4.3';
+
+    const C = globalThis.JiraReplaceCore;
+    const out = [];
+    let failed = 0;
+    const check = (name, actual, expected) => {
+      const ok = JSON.stringify(actual) === JSON.stringify(expected);
+      if (!ok) failed++;
+      out.push(`${ok ? 'PASS' : 'FAIL'} ${name}${ok ? '' : `\n     expected ${JSON.stringify(expected)}\n     actual   ${JSON.stringify(actual)}`}`);
+    };
+    const wait = () => new Promise((r) => setTimeout(r, 50));
+
+    // ---- ProseMirror with a "mention" atom, like Jira Cloud ----
+    const schema = new Schema({
+      nodes: basic.spec.nodes.addToEnd('mention', {
+        inline: true, group: 'inline', atom: true, attrs: { name: {} },
+        toDOM: (n) => ['span', { class: 'mention', contenteditable: 'false' }, '@' + n.attrs.name],
+        parseDOM: [{ tag: 'span.mention', getAttrs: (d) => ({ name: d.textContent.slice(1) }) }],
+      }),
+      marks: basic.spec.marks,
+    });
+    const src = document.createElement('div');
+    src.innerHTML = '<p>Deploy to <strong>staging-old</strong> today. Ask <span class="mention">@Ali</span>ce.</p>'
+      + '<p>URL: https://staging-old.acme.io and STAGING-OLD</p><p>Ali<em>ce</em> owns staging-</p><p>old</p>';
+    const view = new EditorView(document.getElementById('pm'), {
+      state: EditorState.create({ doc: PMParser.fromSchema(schema).parse(src), plugins: [history()] }),
+    });
+    const pmText = () => view.state.doc.textBetween(0, view.state.doc.content.size, '|', (n) => '@' + n.attrs.name);
+    const before = pmText();
+    const re = (find, o) => C.buildRegex(find, o);
+
+    check('PM: count ignores block boundaries', C.allMatches(C.collectText(view.dom).text, re('staging-old')).length, 3);
+    const n = C.replaceInEditable(view.dom, re('staging-old'), 'staging', false);
+    await wait();
+    check('PM: replaced count', n, 3);
+    check('PM: editor model updated, marks/mention kept',
+      pmText(), 'Deploy to staging today. Ask @Alice.|URL: https://staging.acme.io and staging|Alice owns staging-|old');
+    check('PM: bold mark kept on replaced text',
+      view.state.doc.firstChild.child(1).marks.map((m) => m.type.name), ['strong']);
+
+    C.replaceInEditable(view.dom, re('alice'), 'Bob', false);
+    await wait();
+    check('PM: match split by formatting is replaced, mention untouched', pmText(), 'Deploy to staging today. Ask @Alice.|URL: https://staging.acme.io and staging|Bob owns staging-|old');
+
+    C.replaceInEditable(view.dom, re('(\\w+)\\.acme\\.io', { regex: true }), '$1.acme.dev', true);
+    await wait();
+    check('PM: regex groups', pmText().includes('https://staging.acme.dev'), true);
+
+    C.replaceInEditable(view.dom, re('today. '), '', false);
+    await wait();
+    check('PM: empty replacement deletes', pmText().startsWith('Deploy to staging Ask'), true);
+
+    while (undo(view.state, view.dispatch));
+    check('PM: undo history restores the original', pmText(), before);
+
+    // ---- plain contenteditable (TinyMCE-like) ----
+    const plain = document.getElementById('plain');
+    plain.innerHTML = '<p>old one</p><p>two <b>old</b></p>';
+    check('plain: replaced count', C.replaceInEditable(plain, re('old'), 'new', false), 2);
+    check('plain: html', plain.innerHTML.replace(/<span[^>]*>|<\/span>/g, ''), '<p>new one</p><p>two <b>new</b></p>');
+
+    // ---- textarea (wiki markup) via run() ----
+    const ta = document.getElementById('ta');
+    ta.value = 'h1. Old title\n*old* text';
+    let inputs = 0;
+    ta.addEventListener('input', () => inputs++);
+    ta.focus();
+    const r = C.run({ action: 'apply', find: 'old', replace: 'New', options: {} });
+    check('textarea: run result', [r.kind, r.count, r.replaced], ['Text editor', 2, 2]);
+    check('textarea: value', ta.value, 'h1. New title\n*New* text');
+    check('textarea: input event fired', inputs > 0, true);
+
+    // ---- editor selection ----
+    view.focus();
+    check('findEditor: focused editor wins', C.findEditor().el === view.dom, true);
+    document.activeElement.blur();
+    check('findEditor: ambiguous without focus', C.run({ action: 'detect' }).error?.startsWith('Several editors'), true);
+    document.getElementById('noise').setAttribute('data-testid', 'issue.description');
+    document.getElementById('noise').append(ta);
+    check('findEditor: description hint', C.findEditor().el === ta, true);
+    for (const el of [view.dom, plain, ta]) el.remove();
+    check('detect: no editor', C.run({ action: 'detect' }).error?.startsWith('No open editor'), true);
+
+    out.push(`\n${failed ? `${failed} FAILED` : 'ALL PASSED'}`);
+    document.getElementById('results').textContent = out.join('\n');
+    document.getElementById('results').className = failed ? 'fail' : 'pass';
+  </script>
+</body>
+</html>

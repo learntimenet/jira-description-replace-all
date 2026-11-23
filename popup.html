@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jira Description Replace All</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <img class="logo" src="icons/icon128.png" alt="">
+      <div>
+        <h1>Description Replace All</h1>
+        <p class="brand-sub">by Learn Time</p>
+      </div>
+    </div>
+  </header>
+
+  <!-- ============ LOADING ============ -->
+  <section id="view-loading" class="view">
+    <div class="card hero"><span class="eyebrow">Looking for the description editor…</span></div>
+  </section>
+
+  <!-- ============ NO ISSUE ============ -->
+  <section id="view-none" class="view" hidden>
+    <div class="card hero empty">
+      <span class="eyebrow">No editor open</span>
+      <p id="none-text"></p>
+      <ol class="steps">
+        <li>Open the Jira issue.</li>
+        <li>Click the description to start editing it.</li>
+        <li>Click this extension again.</li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- ============ MAIN ============ -->
+  <section id="view-main" class="view" hidden>
+    <div class="card hero issue">
+      <span class="eyebrow">Editing description</span>
+      <span id="issue-key" class="issue-key"></span>
+      <span id="issue-host" class="issue-host"></span>
+    </div>
+
+    <form id="form" class="view-form" novalidate>
+      <div class="card fields">
+        <label class="field">
+          <span class="eyebrow">Find</span>
+          <textarea id="find" rows="2" spellcheck="false" required></textarea>
+        </label>
+        <label class="field">
+          <span class="eyebrow">Replace with</span>
+          <textarea id="replace" rows="2" spellcheck="false" placeholder="Leave empty to remove the value"></textarea>
+        </label>
+      </div>
+
+      <details class="card settings" id="settings">
+        <summary>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="9" cy="6" r="2"/><circle cx="15" cy="12" r="2"/><circle cx="7" cy="18" r="2"/></svg>
+          Match options
+          <span id="options-summary" class="pill"></span>
+          <svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+        </summary>
+        <div class="settings-body">
+          <label class="row">Match case <input type="checkbox" class="switch" id="caseSensitive"></label>
+          <label class="row">Whole word <input type="checkbox" class="switch" id="wholeWord"></label>
+          <label class="row">Regular expression <input type="checkbox" class="switch" id="regex"></label>
+        </div>
+      </details>
+
+      <div class="actions">
+        <button id="preview" type="button" class="secondary">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          Preview
+        </button>
+        <button id="apply" type="submit" class="primary">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 8h13"/><polyline points="13 4 17 8 13 12"/><path d="M20 16H7"/><polyline points="11 12 7 16 11 20"/></svg>
+          Replace all
+        </button>
+      </div>
+    </form>
+
+    <div id="result" class="card result" aria-live="polite" hidden>
+      <div class="card-head">
+        <h2>Result</h2>
+        <span id="result-pill" class="pill"></span>
+      </div>
+      <p id="message"></p>
+      <ul id="snippets" class="snippets"></ul>
+    </div>
+
+  </section>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
