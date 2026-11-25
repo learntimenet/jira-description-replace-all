@@ -85,13 +85,24 @@
     check('plain: replaced count', C.replaceInEditable(plain, re('old'), 'new', false), 2);
     check('plain: html', plain.innerHTML.replace(/<span[^>]*>|<\/span>/g, ''), '<p>new one</p><p>two <b>new</b></p>');
 
+    // ---- link URLs ----
+    plain.innerHTML = '<p>See <a href="https://old.acme.io/x">https://old.acme.io/x</a>, <a href="https://old.acme.io/y">docs</a>'
+      + ' and <span contenteditable="false"><a href="https://old.acme.io/card">card</a></span></p>';
+    check('links: count includes link URLs', C.linkTargets(plain, re('old.acme')).length, 3);
+    C.replaceInEditable(plain, re('old.acme'), 'new.acme', false);
+    const links = await C.replaceInLinks(plain, re('old.acme'), 'new.acme', false);
+    check('links: editable link URLs replaced', [...plain.querySelectorAll('a')].slice(0, 2).map((a) => a.getAttribute('href')),
+      ['https://new.acme.io/x', 'https://new.acme.io/y']);
+    check('links: link text replaced', plain.querySelector('a').textContent, 'https://new.acme.io/x');
+    check('links: replaced count (card has no paste handler here)', links, 2);
+
     // ---- textarea (wiki markup) via run() ----
     const ta = document.getElementById('ta');
     ta.value = 'h1. Old title\n*old* text';
     let inputs = 0;
     ta.addEventListener('input', () => inputs++);
     ta.focus();
-    const r = C.run({ action: 'apply', find: 'old', replace: 'New', options: {} });
+    const r = await C.run({ action: 'apply', find: 'old', replace: 'New', options: {} });
     check('textarea: run result', [r.kind, r.count, r.replaced], ['Text editor', 2, 2]);
     check('textarea: value', ta.value, 'h1. New title\n*New* text');
     check('textarea: input event fired', inputs > 0, true);
@@ -100,12 +111,12 @@
     view.focus();
     check('findEditor: focused editor wins', C.findEditor().el === view.dom, true);
     document.activeElement.blur();
-    check('findEditor: ambiguous without focus', C.run({ action: 'detect' }).error?.startsWith('Several editors'), true);
+    check('findEditor: ambiguous without focus', (await C.run({ action: 'detect' })).error?.startsWith('Several editors'), true);
     document.getElementById('noise').setAttribute('data-testid', 'issue.description');
     document.getElementById('noise').append(ta);
     check('findEditor: description hint', C.findEditor().el === ta, true);
     for (const el of [view.dom, plain, ta]) el.remove();
-    check('detect: no editor', C.run({ action: 'detect' }).error?.startsWith('No open editor'), true);
+    check('detect: no editor', (await C.run({ action: 'detect' })).error?.startsWith('No open editor'), true);
 
     out.push(`\n${failed ? `${failed} FAILED` : 'ALL PASSED'}`);
     document.getElementById('results').textContent = out.join('\n');

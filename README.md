@@ -15,6 +15,7 @@ A browser extension (Chrome / Edge, Manifest V3) that replaces every occurrence 
 - **Match options** (collapsible, remembered): Match case, Whole word (Unicode-aware), and Regex. In Regex mode the replacement can use `$1`, `$<name>`, `$&` and `$$`. Otherwise it is inserted literally.
 - **Preview** shows the number of matches and up to 5 highlighted excerpts before anything changes.
 - **Formatting is kept.** Each match is selected and the new text is typed over it, the same way you would by hand. Bold, links and lists stay as they are, and mentions are never touched. A match that's only partly formatted is replaced too.
+- **Link URLs are replaced too**, including smart links: the link address changes, not only its text.
 - Matches never span two paragraphs or list items.
 - Works with the Jira Cloud editor, the Jira Server / Data Center rich text editor, and the plain-text (wiki markup) editor.
 - Styled like Daily Timekeeper (learntime.net palette, light and dark themes).

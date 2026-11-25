@@ -4,9 +4,13 @@ const $ = (id) => document.getElementById(id);
 const OPTIONS = { caseSensitive: 'Case', wholeWord: 'Word', regex: 'Regex' };
 
 let tab;
+let injected = false;
 
 async function inTab(args) {
-  await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['core.js'] });
+  if (!injected) {
+    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['core.js'] });
+    injected = true;
+  }
   const [{ result }] = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: (a) => globalThis.JiraReplaceCore.run(a),
